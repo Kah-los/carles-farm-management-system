@@ -1,6 +1,0 @@
-const express=require('express'); const db=require('../db'); const {authenticateToken}=require('../middleware/auth'); const r=express.Router(); r.use(authenticateToken);
-r.get('/animals',async(req,res)=>{const {rows}=await db.query('SELECT species,status,COUNT(*)::int count,AVG(weight)::float avg_weight FROM animals GROUP BY species,status ORDER BY species,status');res.json(rows)});
-r.get('/breeding',async(req,res)=>{const {rows}=await db.query('SELECT br.*,a.tag,a.name,a.species FROM breeding_records br LEFT JOIN animals a ON a.id=br.animal_id ORDER BY expected_delivery NULLS LAST, breeding_date DESC');res.json(rows)});
-r.get('/health',async(req,res)=>{const {rows}=await db.query("SELECT * FROM animals WHERE status IN ('Sick','Quarantine') ORDER BY updated_at DESC");res.json(rows)});
-r.get('/finance',async(req,res)=>{const {rows}=await db.query("SELECT type,category,SUM(amount)::float total,COUNT(*)::int count FROM financial_transactions GROUP BY type,category ORDER BY type,category");res.json(rows)});
-r.get('/feed',async(req,res)=>{const {rows}=await db.query('SELECT fl.feed_date,a.species,SUM(fl.quantity_kg)::float total_kg FROM feeding_logs fl LEFT JOIN animals a ON a.id=fl.animal_id GROUP BY fl.feed_date,a.species ORDER BY fl.feed_date DESC');res.json(rows)}); module.exports=r;
