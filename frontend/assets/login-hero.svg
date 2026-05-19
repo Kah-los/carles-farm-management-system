@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" preserveAspectRatio="none" role="img" aria-labelledby="title">
+  <title id="title">Soft farm landscape illustration</title>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#F8FCFB"/>
+      <stop offset="1" stop-color="#DDEEE8"/>
+    </linearGradient>
+    <linearGradient id="hill" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#D6E9DF"/>
+      <stop offset="1" stop-color="#94BCAE"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0D3B3E"/>
+      <stop offset="1" stop-color="#062B2D"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" fill="url(#sky)"/>
+  <circle cx="910" cy="138" r="58" fill="#FFF8F0" opacity=".86"/>
+  <g fill="#FFFFFF" opacity=".72">
+    <ellipse cx="160" cy="165" rx="64" ry="26"/><ellipse cx="216" cy="156" rx="44" ry="20"/><ellipse cx="250" cy="176" rx="72" ry="20"/>
+    <ellipse cx="990" cy="195" rx="80" ry="26"/><ellipse cx="1060" cy="183" rx="48" ry="22"/>
+  </g>
+  <path d="M0 420c150-90 300-120 455-73 142 43 200 5 335-57 126-59 271-59 410 44v426H0z" fill="url(#hill)" opacity=".9"/>
+  <path d="M0 500c161-62 292-74 445-24 141 46 272 43 415-22 135-61 248-69 340-12v318H0z" fill="#BED8CD" opacity=".92"/>
+  <g opacity=".45" fill="#0D3B3E">
+    <rect x="230" y="365" width="82" height="105" rx="4"/>
+    <path d="M212 370l60-55 60 55z"/>
+    <rect x="260" y="410" width="24" height="60" fill="#FFF8F0" opacity=".85"/>
+    <rect x="160" y="350" width="44" height="132" rx="22"/>
+    <rect x="166" y="334" width="32" height="24" rx="10"/>
+    <path d="M84 480h225v12H84zM92 524h220v10H92z"/>
+    <path d="M104 480v65M170 480v65M238 480v65M300 480v65" stroke="#0D3B3E" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <path d="M0 585c145-66 310-88 504-35 255 68 479 13 696-72v282H0z" fill="url(#front)"/>
+  <path d="M0 650c240-95 430-90 612-33 174 55 350 50 588-35v178H0z" fill="#052B2D" opacity=".72"/>
+  <g opacity=".25" fill="none" stroke="#FFF8F0" stroke-width="5" stroke-linecap="round">
+    <path d="M130 680c160-44 316-41 469 9"/>
+    <path d="M610 658c154 28 318 13 476-58"/>
+    <path d="M60 720c160-35 330-29 510 17"/>
+  </g>
+</svg>
