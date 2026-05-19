@@ -1,7 +1,19 @@
-const API_BASE_URL = window.CARLES_API_URL || 'https://carles-farm-backend-production.up.railway.app/api';
+// Carles Farm Management - Complete API Integration Layer
+// This file handles ALL communication with the Railway backend
+
+const API_BASE_URL = 'https://carles-farm-backend-production.up.railway.app/api';
+
+// ═══════════════════════════════════════════════════════
+// AUTHENTICATION & TOKEN MANAGEMENT
+// ═══════════════════════════════════════════════════════
 
 function getAuthToken() {
   return localStorage.getItem('carles_auth_token');
+}
+
+function getCurrentUser() {
+  const userStr = localStorage.getItem('carles_current_user');
+  return userStr ? JSON.parse(userStr) : null;
 }
 
 function saveAuth(token, user) {
@@ -14,107 +26,418 @@ function clearAuth() {
   localStorage.removeItem('carles_current_user');
 }
 
-function qs(params = {}) {
-  const query = new URLSearchParams(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== '' && value !== null)
-  ).toString();
-  return query ? `?${query}` : '';
+function isLoggedIn() {
+  return !!getAuthToken();
 }
+
+// ═══════════════════════════════════════════════════════
+// API HELPER FUNCTION
+// ═══════════════════════════════════════════════════════
 
 async function apiCall(endpoint, options = {}) {
   const token = getAuthToken();
+  
   const headers = {
     'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers
   };
 
-  let response;
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-  } catch (err) {
-    throw new Error('Cannot reach the farm server. Check your internet connection or Railway backend URL.');
-  }
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers
+    });
 
-  if (response.status === 401) {
-    clearAuth();
-    window.dispatchEvent(new Event('auth-expired'));
-    throw new Error('Session expired. Please sign in again.');
-  }
+    if (response.status === 401) {
+      clearAuth();
+      window.location.reload();
+      throw new Error('Session expired. Please login again.');
+    }
 
-  let data = null;
-  try { data = await response.json(); } catch (err) {}
-  if (!response.ok) throw new Error((data && data.error) || 'Request failed. Please try again.');
-  return data;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`API Error (${endpoint}):`, error);
+    throw error;
+  }
 }
 
+// ═══════════════════════════════════════════════════════
+// CARLES API - ALL ENDPOINTS
+// ═══════════════════════════════════════════════════════
+
 window.CarlesAPI = {
+  
+  // ─────────────────────────────────────────────────────
+  // AUTHENTICATION
+  // ─────────────────────────────────────────────────────
+  
   login: async (username, pin) => {
-    const data = await apiCall('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, pin })
-    });
-    if (data.token) saveAuth(data.token, data.user);
-    return data;
+    try {
+      const data = await apiCall('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, pin })
+      });
+      
+      if (data.token && data.user) {
+        saveAuth(data.token, data.user);
+        return { success: true, user: data.user };
+      }
+      
+      return { success: false, error: data.error || 'Login failed' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   },
+  
   logout: () => {
     clearAuth();
     window.location.reload();
   },
-  getCurrentUser: () => {
-    try { return JSON.parse(localStorage.getItem('carles_current_user')); } catch (err) { return null; }
+  
+  getCurrentUser: getCurrentUser,
+  isLoggedIn: isLoggedIn,
+  
+  changePin: async (currentPin, newPin) => {
+    return await apiCall('/auth/change-pin', {
+      method: 'POST',
+      body: JSON.stringify({ currentPin, newPin })
+    });
   },
-  me: () => apiCall('/auth/me'),
-  changePin: data => apiCall('/auth/change-pin', { method: 'POST', body: JSON.stringify(data) }),
-
-  getAnimals: (params = {}) => apiCall(`/animals${qs(params)}`),
-  getAnimal: id => apiCall(`/animals/${id}`),
-  createAnimal: data => apiCall('/animals', { method: 'POST', body: JSON.stringify(data) }),
-  updateAnimal: (id, data) => apiCall(`/animals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteAnimal: id => apiCall(`/animals/${id}`, { method: 'DELETE' }),
-  addWeight: (id, data) => apiCall(`/animals/${id}/weight`, { method: 'POST', body: JSON.stringify(data) }),
-
-  getIngredients: () => apiCall('/feed/ingredients'),
-  createIngredient: data => apiCall('/feed/ingredients', { method: 'POST', body: JSON.stringify(data) }),
-  updateIngredient: (id, data) => apiCall(`/feed/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteIngredient: id => apiCall(`/feed/ingredients/${id}`, { method: 'DELETE' }),
-  getFormulas: () => apiCall('/feed/formulas'),
-  createFormula: data => apiCall('/feed/formulas', { method: 'POST', body: JSON.stringify(data) }),
-  deleteFormula: id => apiCall(`/feed/formulas/${id}`, { method: 'DELETE' }),
-  getFeedingLogs: () => apiCall('/feed/logs'),
-  createFeedingLog: data => apiCall('/feed/logs', { method: 'POST', body: JSON.stringify(data) }),
-
-  getMedications: () => apiCall('/medications'),
-  createMedication: data => apiCall('/medications', { method: 'POST', body: JSON.stringify(data) }),
-  updateMedication: (id, data) => apiCall(`/medications/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteMedication: id => apiCall(`/medications/${id}`, { method: 'DELETE' }),
-  getMedicationLogs: () => apiCall('/medications/logs'),
-  createMedicationLog: data => apiCall('/medications/logs', { method: 'POST', body: JSON.stringify(data) }),
-
-  getBreedingRecords: () => apiCall('/breeding'),
-  createBreedingRecord: data => apiCall('/breeding', { method: 'POST', body: JSON.stringify(data) }),
-  updateBreedingRecord: (id, data) => apiCall(`/breeding/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteBreedingRecord: id => apiCall(`/breeding/${id}`, { method: 'DELETE' }),
-
-  getTransactions: (params = {}) => apiCall(`/finance${qs(params)}`),
-  getFinanceSummary: () => apiCall('/finance/summary'),
-  createTransaction: data => apiCall('/finance', { method: 'POST', body: JSON.stringify(data) }),
-  updateTransaction: (id, data) => apiCall(`/finance/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteTransaction: id => apiCall(`/finance/${id}`, { method: 'DELETE' }),
-
-  getUsers: () => apiCall('/users'),
-  createUser: data => apiCall('/users', { method: 'POST', body: JSON.stringify(data) }),
-  updateUser: (id, data) => apiCall(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteUser: id => apiCall(`/users/${id}`, { method: 'DELETE' }),
-
-  report: name => apiCall(`/reports/${name}`)
+  
+  // ─────────────────────────────────────────────────────
+  // ANIMALS
+  // ─────────────────────────────────────────────────────
+  
+  getAnimals: async (filters = {}) => {
+    const params = new URLSearchParams(filters).toString();
+    return await apiCall(`/animals${params ? '?' + params : ''}`);
+  },
+  
+  getAnimal: async (id) => {
+    return await apiCall(`/animals/${id}`);
+  },
+  
+  createAnimal: async (animalData) => {
+    return await apiCall('/animals', {
+      method: 'POST',
+      body: JSON.stringify(animalData)
+    });
+  },
+  
+  updateAnimal: async (id, animalData) => {
+    return await apiCall(`/animals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(animalData)
+    });
+  },
+  
+  deleteAnimal: async (id) => {
+    return await apiCall(`/animals/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  addAnimalWeight: async (id, weightData) => {
+    return await apiCall(`/animals/${id}/weight`, {
+      method: 'POST',
+      body: JSON.stringify(weightData)
+    });
+  },
+  
+  getAnimalStats: async () => {
+    return await apiCall('/animals/stats/summary');
+  },
+  
+  // ─────────────────────────────────────────────────────
+  // FEED
+  // ─────────────────────────────────────────────────────
+  
+  getIngredients: async () => {
+    return await apiCall('/feed/ingredients');
+  },
+  
+  createIngredient: async (ingredientData) => {
+    return await apiCall('/feed/ingredients', {
+      method: 'POST',
+      body: JSON.stringify(ingredientData)
+    });
+  },
+  
+  updateIngredient: async (id, ingredientData) => {
+    return await apiCall(`/feed/ingredients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(ingredientData)
+    });
+  },
+  
+  deleteIngredient: async (id) => {
+    return await apiCall(`/feed/ingredients/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  getFormulas: async () => {
+    return await apiCall('/feed/formulas');
+  },
+  
+  createFormula: async (formulaData) => {
+    return await apiCall('/feed/formulas', {
+      method: 'POST',
+      body: JSON.stringify(formulaData)
+    });
+  },
+  
+  deleteFormula: async (id) => {
+    return await apiCall(`/feed/formulas/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  getFeedingLogs: async () => {
+    return await apiCall('/feed/logs');
+  },
+  
+  recordFeeding: async (feedingData) => {
+    return await apiCall('/feed/logs', {
+      method: 'POST',
+      body: JSON.stringify(feedingData)
+    });
+  },
+  
+  // ─────────────────────────────────────────────────────
+  // MEDICATIONS
+  // ─────────────────────────────────────────────────────
+  
+  getMedications: async () => {
+    return await apiCall('/medications');
+  },
+  
+  createMedication: async (medicationData) => {
+    return await apiCall('/medications', {
+      method: 'POST',
+      body: JSON.stringify(medicationData)
+    });
+  },
+  
+  updateMedication: async (id, medicationData) => {
+    return await apiCall(`/medications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(medicationData)
+    });
+  },
+  
+  deleteMedication: async (id) => {
+    return await apiCall(`/medications/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  getMedicationDosages: async (medicationId) => {
+    return await apiCall(`/medications/${medicationId}/dosages`);
+  },
+  
+  createDosage: async (medicationId, dosageData) => {
+    return await apiCall(`/medications/${medicationId}/dosages`, {
+      method: 'POST',
+      body: JSON.stringify(dosageData)
+    });
+  },
+  
+  getMedicationLogs: async () => {
+    return await apiCall('/medications/logs');
+  },
+  
+  recordMedication: async (medicationData) => {
+    return await apiCall('/medications/logs', {
+      method: 'POST',
+      body: JSON.stringify(medicationData)
+    });
+  },
+  
+  // ─────────────────────────────────────────────────────
+  // BREEDING
+  // ─────────────────────────────────────────────────────
+  
+  getBreedingRecords: async () => {
+    return await apiCall('/breeding');
+  },
+  
+  createBreedingRecord: async (breedingData) => {
+    return await apiCall('/breeding', {
+      method: 'POST',
+      body: JSON.stringify(breedingData)
+    });
+  },
+  
+  updateBreedingRecord: async (id, breedingData) => {
+    return await apiCall(`/breeding/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(breedingData)
+    });
+  },
+  
+  deleteBreedingRecord: async (id) => {
+    return await apiCall(`/breeding/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  // ─────────────────────────────────────────────────────
+  // FINANCE
+  // ─────────────────────────────────────────────────────
+  
+  getTransactions: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return await apiCall(`/finance${query ? '?' + query : ''}`);
+  },
+  
+  createTransaction: async (transactionData) => {
+    return await apiCall('/finance', {
+      method: 'POST',
+      body: JSON.stringify(transactionData)
+    });
+  },
+  
+  updateTransaction: async (id, transactionData) => {
+    return await apiCall(`/finance/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(transactionData)
+    });
+  },
+  
+  deleteTransaction: async (id) => {
+    return await apiCall(`/finance/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  getFinanceSummary: async () => {
+    return await apiCall('/finance/summary');
+  },
+  
+  // ─────────────────────────────────────────────────────
+  // REPORTS
+  // ─────────────────────────────────────────────────────
+  
+  getAnimalReport: async () => {
+    return await apiCall('/reports/animals');
+  },
+  
+  getBreedingReport: async () => {
+    return await apiCall('/reports/breeding');
+  },
+  
+  getHealthReport: async () => {
+    return await apiCall('/reports/health');
+  },
+  
+  getFinanceReport: async () => {
+    return await apiCall('/reports/finance');
+  },
+  
+  getFeedReport: async () => {
+    return await apiCall('/reports/feed');
+  },
+  
+  // ─────────────────────────────────────────────────────
+  // USERS (Admin only)
+  // ─────────────────────────────────────────────────────
+  
+  getUsers: async () => {
+    return await apiCall('/users');
+  },
+  
+  createUser: async (userData) => {
+    return await apiCall('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  },
+  
+  updateUser: async (id, userData) => {
+    return await apiCall(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+  },
+  
+  deleteUser: async (id) => {
+    return await apiCall(`/users/${id}`, {
+      method: 'DELETE'
+    });
+  }
 };
+
+// ═══════════════════════════════════════════════════════
+// CONSTANTS FOR UI
+// ═══════════════════════════════════════════════════════
 
 window.SPECIES = ['Cow', 'Pig', 'Goat', 'Sheep', 'Chicken'];
+
 window.SPECIES_META = {
-  Cow: { plural: 'Cattle', accent: '#0D3B3E', gestation: 283 },
-  Pig: { plural: 'Pigs', accent: '#FF6B6B', gestation: 114 },
-  Goat: { plural: 'Goats', accent: '#14B8A6', gestation: 150 },
-  Sheep: { plural: 'Sheep', accent: '#8B5CF6', gestation: 147 },
-  Chicken: { plural: 'Chickens', accent: '#F5B642', gestation: 21 }
+  'Cow': { plural: 'Cattle', accent: '#0D3B3E', gestation: 283 },
+  'Pig': { plural: 'Pigs', accent: '#FF6B6B', gestation: 114 },
+  'Goat': { plural: 'Goats', accent: '#14B8A6', gestation: 150 },
+  'Sheep': { plural: 'Sheep', accent: '#8B5CF6', gestation: 147 },
+  'Chicken': { plural: 'Chickens', accent: '#F5B642', gestation: 21 }
 };
+
+window.ANIMAL_STATUSES = ['Healthy', 'Sick', 'Quarantine', 'Sold', 'Deceased'];
+
+window.USER_ROLES = ['Admin', 'Manager', 'Worker', 'Veterinarian'];
+
+window.TRANSACTION_TYPES = ['Income', 'Expense'];
+
+window.BREEDING_STATUSES = ['Pending', 'Pregnant', 'Delivered', 'Failed'];
+
+window.FEED_UNITS = ['kg', 'g', 'ml', 'l'];
+
+window.MEDICATION_TYPES = ['Antibiotic', 'Vaccine', 'Antiparasitic', 'Vitamin', 'Supplement', 'Other'];
+
+// ═══════════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════
+
+// Calculate expected delivery date based on species and breeding date
+window.calculateDeliveryDate = function(species, breedingDate) {
+  if (!species || !breedingDate) return null;
+  
+  const gestationDays = window.SPECIES_META[species]?.gestation || 0;
+  if (gestationDays === 0) return null;
+  
+  const breeding = new Date(breedingDate);
+  const delivery = new Date(breeding);
+  delivery.setDate(delivery.getDate() + gestationDays);
+  
+  return delivery.toISOString().split('T')[0];
+};
+
+// Calculate days until delivery
+window.daysUntilDelivery = function(expectedDeliveryDate) {
+  if (!expectedDeliveryDate) return null;
+  
+  const today = new Date();
+  const delivery = new Date(expectedDeliveryDate);
+  const diff = Math.ceil((delivery - today) / (1000 * 60 * 60 * 24));
+  
+  return diff;
+};
+
+// Check if animal is near term (within 7 days)
+window.isNearTerm = function(expectedDeliveryDate) {
+  const days = window.daysUntilDelivery(expectedDeliveryDate);
+  return days !== null && days >= 0 && days <= 7;
+};
+
+// ═══════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════
+
+console.log('✅ Carles API initialized');
+console.log('📡 Backend URL:', API_BASE_URL);
